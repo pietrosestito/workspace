@@ -13,7 +13,7 @@ return {
     block = { i = 9, hurt = { -28, -130, 33, 2 }, hit = nil },
     cblock = { i = 10, hurt = { -18, -97, 46, 3 }, hit = nil },
     hit = { i = 11, hurt = { -53, -124, 27, 3 }, hit = nil },
-    ko1 = { i = 12, hurt = { -68, -94, 56, 3 }, hit = nil },
+    ko1 = { i = 12, hurt = { -68, -91, 56, 3 }, hit = nil },
     ko2 = { i = 13, hurt = { -73, -47, 67, 3 }, hit = nil },
     win = { i = 14, hurt = { -25, -143, 30, 2 }, hit = nil },
     lp1 = { i = 15, hurt = { -25, -130, 60, 2 }, hit = nil },

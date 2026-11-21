@@ -107,10 +107,80 @@ def nonno_head_small(big):
     return head
 
 
+def nonno_head_34():
+    """Nonno's head in 3/4 view looking right, 26x29.
+
+    Big shapes are drawn at 4x and box-reduced (smooth contours), then snapped to the
+    portrait palette; eyes, brows and mouth are inked at 1x so they stay crisp.
+    """
+    S, W, H = 4, 26, 29
+    big = Image.new('RGBA', (W * S, H * S), M.CLEAR)
+    d = ImageDraw.Draw(big)
+    sk, gr = M.SK, M.GR
+    A = lambda c: c + (255,)
+    Q = lambda pts: [(x * S, y * S) for x, y in pts]
+    E = lambda x0, y0, x1, y1: (x0 * S, y0 * S, x1 * S, y1 * S)
+    # hair at the back of the head (behind the skull)
+    d.ellipse(E(1, 3, 15, 21), fill=A(gr[1]))
+    # skull + jaw + chin
+    d.ellipse(E(3, 1, 23, 21), fill=A(sk[1]))
+    d.polygon(Q([(5, 13), (22, 12), (23.5, 18), (21, 24.5), (16, 28), (11, 27.5), (7, 24), (5, 19)]), fill=A(sk[1]))
+    # light on the forehead and cheek, shade on the back of the jaw
+    d.ellipse(E(8, 2, 20, 10), fill=A(sk[0]))
+    d.ellipse(E(14, 13, 20, 17), fill=A(sk[0]))
+    d.polygon(Q([(5, 15), (9, 16), (10, 24), (8, 25), (5, 20)]), fill=A(sk[2]))
+    # nose sticking out of the profile
+    d.polygon(Q([(20, 10.5), (25.5, 16.5), (24.5, 18), (21, 18)]), fill=A(sk[1]))
+    d.polygon(Q([(21, 17), (24.5, 17.2), (24, 18), (21.5, 18.3)]), fill=A(sk[2]))
+    # side hair over the ear and the thin fringe on top
+    d.polygon(Q([(2, 7), (6, 3.5), (9, 4.5), (8, 9), (7, 13), (5.5, 18), (3, 16), (1.5, 11)]), fill=A(gr[1]))
+    d.polygon(Q([(3, 7), (5, 5), (6, 9), (4, 14), (3, 11)]), fill=A(gr[0]))
+    d.polygon(Q([(8, 2.5), (14, 0.8), (19, 1.5), (16, 2.6), (11, 3.4)]), fill=A(gr[1]))
+    # near ear
+    d.ellipse(E(5, 11, 9.5, 18), fill=A(sk[2]))
+    d.ellipse(E(6, 12.5, 8.5, 16.5), fill=A(sk[1]))
+    head = big.resize((W, H), Image.BOX)
+    pal = list(sk) + list(gr) + [(252, 250, 242), (84, 72, 62)]
+    head = M.quantize_to(head, pal)
+    d = ImageDraw.Draw(head)
+    # stubble on the jaw and the chin (checkerboard, as on the portrait)
+    for y in range(20, 28):
+        for x in range(7, 23):
+            px = head.getpixel((x, y))
+            if px[3] and px[:3] in (sk[0], sk[1], sk[2]) and (x + y) % 2 == 0 and not (12 <= x <= 21 and 19 <= y <= 22):
+                head.putpixel((x, y), A(gr[1] if (x * 3 + y) % 5 else gr[2]))
+    # eyes: near one bigger, far one smaller and closer to the profile
+    d.rectangle((12, 11, 15, 12), fill=A((252, 250, 242)))
+    d.rectangle((14, 11, 15, 12), fill=A((84, 72, 62)))
+    d.point((15, 11), fill=A(M.OL))
+    d.line((12, 10, 15, 10), fill=A(M.OL))
+    d.rectangle((19, 11, 20, 12), fill=A((252, 250, 242)))
+    d.point((20, 11), fill=A(M.OL)); d.point((20, 12), fill=A((84, 72, 62)))
+    d.line((19, 10, 20, 10), fill=A(M.OL))
+    # brows (grey, bushy) and forehead lines
+    d.line((11, 8, 16, 8), fill=A(gr[2])); d.point((11, 9), fill=A(gr[2]))
+    d.line((18, 8, 21, 8), fill=A(gr[2]))
+    d.line((11, 5, 17, 5), fill=A(sk[2]))
+    # big smile with the upper teeth, smile fold
+    d.line((13, 20, 21, 20), fill=A(M.OL))
+    d.line((14, 21, 20, 21), fill=A(M.OL))
+    d.line((14, 20, 20, 20), fill=A((252, 250, 242)))
+    d.point((12, 19), fill=A(M.OL)); d.point((22, 19), fill=A(sk[3]))
+    d.line((12, 16, 11, 19), fill=A(sk[2]))
+    # near ear and nose ridge, inked so they read at this size
+    d.rectangle((6, 12, 8, 17), fill=A(sk[1]))
+    d.line((5, 13, 5, 16), fill=A(sk[2])); d.line((6, 12, 8, 12), fill=A(sk[2])); d.line((6, 17, 8, 17), fill=A(sk[2]))
+    d.line((7, 14, 7, 15), fill=A(sk[3]))
+    d.line((20, 12, 22, 15), fill=A(sk[2]))
+    # wrinkle at the eye corner (crow's feet towards the ear)
+    d.point((11, 12), fill=A(sk[2])); d.point((10, 13), fill=A(sk[2]))
+    return M.outline(head, M.OL)
+
+
 def nonno():
     big = portrait.build()
     sk = M.SK
-    return Char('nonno', head=nonno_head_small(big), thigh=28, shin=27, uarm=22, farm=20, torso=40, neck=4,
+    return Char('nonno', head=nonno_head_34(), thigh=28, shin=27, uarm=22, farm=20, torso=40, neck=4,
                 shoulders=44, chest=38, waist=24, arm=(15, 10, 5), fore=(12, 8, 3), leg=(19, 12, 4), calf=(14, 8, 5),
                 neckw=12, fist=5, skin=sk[:3], top=NONNO_TOP, shorts=[(62, 68, 116), M.SHORT], bare=False,
                 ol=M.OL, foot=sk[1])
