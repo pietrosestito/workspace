@@ -236,7 +236,7 @@ function L.update()
     elseif L.state == "pause" then
         if I.pressed("start") then L.state = "play" end
     elseif L.state == "clear" or L.state == "over" then
-        if L.t > 60 and (I.pressed("start") or I.pressed("a")) then G.switch("story") end
+        if L.t > 60 and (I.pressed("start") or I.pressed("a")) then G.switch("menu") end
     end
 end
 

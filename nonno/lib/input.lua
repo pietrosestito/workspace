@@ -2,15 +2,16 @@
 -- Sources: keyboard, gamepads (R36S, Android pads), plain joysticks, touch overlay.
 local R = require("lib.retro")
 local I = { cur = {}, prev = {}, touchMode = false, script = nil }
-local BUTTONS = { "left", "right", "up", "down", "a", "b", "start", "select" }
+local BUTTONS = { "left", "right", "up", "down", "a", "b", "x", "y", "start", "select" }
 
 local KEYS = {
     left = { "left" }, right = { "right" }, up = { "up" }, down = { "down" },
-    a = { "z", "space" }, b = { "x" }, start = { "return", "escape" }, select = { "tab", "rshift" },
+    a = { "z", "space" }, b = { "x" }, x = { "s" }, y = { "a" },
+    start = { "return", "escape" }, select = { "tab", "rshift" },
 }
 local PAD = {
     left = { "dpleft" }, right = { "dpright" }, up = { "dpup" }, down = { "dpdown" },
-    a = { "a" }, b = { "b", "x" }, start = { "start" }, select = { "back" },
+    a = { "a" }, b = { "b" }, x = { "x" }, y = { "y" }, start = { "start" }, select = { "back" },
 }
 
 -- touch zones in screen coordinates (recomputed every frame: screens rotate)
@@ -20,8 +21,10 @@ local function zones()
     return {
         left = { s * 0.9, h - s * 1.1, s * 0.75 },
         right = { s * 2.6, h - s * 1.1, s * 0.75 },
-        a = { w - s * 1.1, h - s * 1.1, s * 0.85 },
-        b = { w - s * 2.8, h - s * 0.9, s * 0.6 },
+        a = { w - s * 0.8, h - s * 1.7, s * 0.6 },          -- SNES-style diamond
+        b = { w - s * 1.8, h - s * 0.8, s * 0.6 },
+        x = { w - s * 1.8, h - s * 2.6, s * 0.6 },
+        y = { w - s * 2.8, h - s * 1.7, s * 0.6 },
         start = { w - s * 0.6, s * 0.5, s * 0.4 },
     }
 end
@@ -71,6 +74,10 @@ function I.update()
                 end
                 if j:isDown(1) then st.a = true end
                 if j:getButtonCount() >= 2 and j:isDown(2) then st.b = true end
+                if j:getButtonCount() >= 4 then
+                    if j:isDown(3) then st.x = true end
+                    if j:isDown(4) then st.y = true end
+                end
             end
         end
         if next(st) then I.touchMode = false end
@@ -85,7 +92,7 @@ function I.pressed(b) return I.cur[b] == true and not I.prev[b] end
 -- drawn in screen space, after the retro canvas, only when touch is in use
 function I.drawTouch()
     if not I.touchMode then return end
-    local labels = { a = "A", b = "B", start = "II" }
+    local labels = { a = "A", b = "B", x = "X", y = "Y", start = "II" }
     local s = R.scale
     for name, c in pairs(zones()) do
         love.graphics.setColor(1, 1, 1, I.cur[name] and 0.45 or 0.2)

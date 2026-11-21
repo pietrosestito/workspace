@@ -11,7 +11,7 @@ local test
 
 -- under test, a Lua error must end the process instead of showing the blue screen
 for _, a in ipairs(arg or {}) do
-    if a == "--test" then
+    if a == "--test" or a == "--test-fight" then
         function love.errorhandler(msg)
             print("ERROR " .. debug.traceback(tostring(msg), 2))
             os.exit(2)
@@ -28,15 +28,19 @@ end
 function love.load(args)
     R.init()
     T.init()
-    for _, n in ipairs({ "nonno_portrait", "nonno", "crab", "ball", "tiles", "bg_sky", "bg_sea", "bg_palms" }) do
+    for _, n in ipairs({ "nonno_portrait", "nonno", "crab", "ball", "tiles", "bg_sky", "bg_sea", "bg_palms",
+                         "f_nonno", "f_toro", "spark", "bigball" }) do
         G.img[n] = love.graphics.newImage("assets/" .. n .. ".png")
     end
     G.scenes.story = require("scenes.story")
     G.scenes.level = require("scenes.level")
+    G.scenes.fight = require("scenes.fight")
+    G.scenes.menu = require("scenes.menu")
     for _, a in ipairs(args or {}) do
         if a == "--test" then test = require("test.autotest") end
+        if a == "--test-fight" then test = require("test.fighttest") end
     end
-    G.switch("story")
+    G.switch("menu")
     if test then test.start() end
 end
 

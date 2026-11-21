@@ -4,7 +4,7 @@ local I = require("lib.input")
 local R = require("lib.retro")
 local A = {}
 local log, fails, shots, want = {}, 0, {}, nil
-local t, phase, jumpHold, maxX = 0, "story", 0, 0
+local t, phase, jumpHold, maxX = 0, "menu", 0, 0
 local seen = {}
 
 local function check(cond, msg)
@@ -16,7 +16,7 @@ local function shot(name) want = name end
 
 function A.start()
     print("save dir: " .. love.filesystem.getSaveDirectory())
-    check(G.sceneName == "story", "boots into the story scene")
+    check(G.sceneName == "menu", "boots into the menu")
     I.script = function() return A.buttons() end
 end
 
@@ -48,7 +48,10 @@ end
 
 function A.buttons()
     t = t + 1
-    if phase == "story" then
+    if phase == "menu" then
+        if t == 20 then return { a = true } end
+        return {}
+    elseif phase == "story" then
         if t % 30 == 0 then return { a = true } end
         return {}
     elseif phase == "level" then
@@ -61,7 +64,13 @@ end
 
 function A.update()
     local S = G.scenes.story
-    if phase == "story" then
+    if phase == "menu" then
+        if t == 5 then shot("0_menu") end
+        if G.sceneName == "story" then
+            check(true, "A on STORIA starts the story")
+            phase, t = "story", 0
+        end
+    elseif phase == "story" then
         if G.sceneName == "story" then
             if S.page == 1 and S.chars == 10 and not seen.p1 then seen.p1 = true; shot("1_story") end
             if S.page == 2 then seen.p2 = true end

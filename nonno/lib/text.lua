@@ -34,6 +34,17 @@ function T.center(s, y, col)
     T.print(s, math.floor((320 - T.width(T.clean(s))) / 2), y, col)
 end
 
+-- centred text scaled by an integer factor (titles, timer, KO)
+function T.big(s, y, scale, col)
+    s = T.clean(s)
+    local x = math.floor((320 - (#s * 6 - 1) * scale) / 2)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.print(s, x + scale, y + scale, 0, scale, scale)
+    love.graphics.setColor(col or { 1, 1, 1 })
+    love.graphics.print(s, x, y, 0, scale, scale)
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
 -- greedy word wrap to a width in characters
 function T.wrap(s, cols)
     local lines, line = {}, ""
