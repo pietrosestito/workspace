@@ -31,6 +31,11 @@ local function bot()
     for _, c in ipairs(L.crabs) do
         if c.dead == 0 and c.x > p.x and c.x - (p.x + p.w) < 34 and math.abs(c.y - p.y - p.h + c.h) < 20 then danger = true end
     end
+    local target = false
+    for _, c in ipairs(L.crabs) do
+        if c.dead == 0 and c.x > p.x + 30 and c.x - p.x < 130 and math.abs(c.y + c.h - p.y - p.h) < 4 then target = true end
+    end
+    if p.ground and target and #L.balls == 0 and p.throw == 0 and t % 2 == 0 then b.b = true end
     if jumpHold > 0 then
         jumpHold = jumpHold - 1
         b.a = true
@@ -71,10 +76,15 @@ function A.update()
         local L = G.scenes.level
         maxX = math.max(maxX, L.p.x)
         if not seen.mid and L.p.x > 700 then seen.mid = true; shot("4_level_mid") end
-        if not seen.air and not L.p.ground and L.p.x > 250 then seen.air = true; shot("5_jump") end
+        if not seen.air and not L.p.ground and L.p.vy < 0 and L.p.x > 250 then seen.air = true; shot("5_jump") end
+        if not seen.ball and #L.balls > 0 and L.balls[1].life == 150 - 8 then seen.ball = true; shot("5b_throw") end
+        if not seen.knock then
+            for _, c in ipairs(L.crabs) do if c.dead < 0 and c.vy > -1 and c.vy < 0 then seen.knock = true; shot("5c_knock") end end
+        end
         if L.state ~= "play" then
             check(L.state == "clear", "the bot reaches the goal (" .. L.state .. ", x=" .. math.floor(maxX) .. ")")
-            check(L.stomps >= 1, "crabs can be stomped (" .. L.stomps .. ")")
+            check(L.throws >= 1 and L.hits >= 1, "B throws the ball and it knocks crabs out (" .. L.throws .. " throws, " .. L.hits .. " hits)")
+            check(L.stomps + L.hits >= 3, "crabs defeated: " .. L.stomps .. " stomped, " .. L.hits .. " by the ball")
             check(L.lives >= 1, "lives left: " .. L.lives)
             phase, t = "end", 0
         elseif t > 60 * 120 then

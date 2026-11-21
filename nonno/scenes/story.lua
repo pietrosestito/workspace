@@ -13,7 +13,7 @@ local PAGES = {
 local SHRINK = 70       -- frames
 local FLASH = 8
 local P0 = { x = 14, y = 240 - 30 - 188 }   -- portrait top-left at 2x (bottom on the sand)
-local P1 = { x = 48, y = 208 - 47 }         -- where the level's player stands, at 0.5x
+local P1 = { x = 52, y = 208 - 47 }         -- where the level's player stands, at 0.5x
 
 function S.enter()
     S.page, S.chars, S.t, S.phase = 1, 0, 0, "text"
@@ -39,7 +39,7 @@ end
 local function ground()
     love.graphics.draw(G.img.bg_sky, 0, 0)
     love.graphics.draw(G.img.bg_sea, 0, 110)
-    love.graphics.draw(G.img.bg_palms, 0, 110)
+    love.graphics.draw(G.img.bg_palms, 0, 88)
     local tiles = G.img.tiles
     S.q = S.q or { love.graphics.newQuad(0, 0, 16, 16, tiles), love.graphics.newQuad(16, 0, 16, 16, tiles) }
     for x = 0, 19 do

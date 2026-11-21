@@ -1,0 +1,1 @@
+idle idle2 run1 run2 run3 run4 jump fall hurt throw1 throw2

@@ -8,10 +8,17 @@ local GRAV, MAXFALL = 0.35, 6
 local ACC, FRICTION, MAXRUN = 0.25, 0.2, 2.0
 local JUMP, JUMPCUT = -6.2, -2.0
 local COYOTE, BUFFER = 6, 6
--- Nonno: 32x48 sprite, 14x40 hitbox
-local PW, PH, POX, POY = 14, 40, 9, 8
-local FRAMES = { idle = 0, idle2 = 1, run1 = 2, run2 = 3, run3 = 4, jump = 5, hurt = 6 }
-local RUNCYCLE = { "run1", "run2", "run3", "run2" }
+-- Nonno: 40x52 sprite, 14x44 hitbox
+local FW, FH = 40, 52
+local PW, PH, POX, POY = 14, 44, 13, 8
+local RUNCYCLE = { "run1", "run2", "run3", "run4" }
+local THROW_WIND, THROW_END = 6, 14      -- frames of throw1, then throw2; the ball leaves at THROW_WIND
+local BALL_LIFE = 150
+local FRAMES = {}                        -- name -> index, from the order written by mkassets.py
+do
+    local i = 0
+    for name in love.filesystem.read("assets/nonno.txt"):gmatch("%S+") do FRAMES[name] = i; i = i + 1 end
+end
 
 local quads = {}
 
@@ -82,14 +89,15 @@ end
 
 function L.enter()
     L.map = loadMap("levels/spiaggia.txt")
-    L.lives, L.stomps = 3, 0
+    L.lives, L.stomps, L.hits, L.throws = 3, 0, 0, 0
     L.respawn()
 end
 
 function L.respawn()
     local m = L.map
     L.p = { x = m.px + POX, y = m.py - PH, w = PW, h = PH, vx = 0, vy = 0,
-            dir = 1, ground = true, coyote = 0, buffer = 0, inv = 0, anim = 0 }
+            dir = 1, ground = true, coyote = 0, buffer = 0, inv = 0, anim = 0, throw = 0 }
+    L.balls = {}
     L.crabs = {}
     for _, c in ipairs(m.crabs) do
         L.crabs[#L.crabs + 1] = { x = c[1], y = c[2] - 12, w = 20, h = 12, vx = -0.5, vy = 0, dead = 0 }
@@ -129,6 +137,20 @@ local function updatePlayer()
     p.inv = math.max(0, p.inv - 1)
     p.anim = p.anim + math.abs(p.vx)
 
+    -- B: volleyball. On the ground it flies in an arc, in the air it is a spike.
+    if I.pressed("b") and p.throw == 0 and #L.balls == 0 and p.inv <= 60 then p.throw = 1 end
+    if p.throw > 0 then
+        p.throw = p.throw + 1
+        if p.throw == THROW_WIND then
+            local sx = p.x - POX
+            local bx = p.dir > 0 and sx + 33 or sx + FW - 33 - 8
+            L.balls[1] = { x = bx, y = p.y - POY + 30, w = 8, h = 8, life = BALL_LIFE, bounces = 0,
+                           vx = 3.5 * p.dir, vy = p.ground and -2.5 or 2.5 }
+            L.throws = L.throws + 1
+        end
+        if p.throw > THROW_END then p.throw = 0 end
+    end
+
     if p.y > 260 then                                  -- fell in the sea
         L.lives = L.lives - 1
         L.shake = 10
@@ -141,10 +163,44 @@ local function updatePlayer()
     end
 end
 
+local function overlap(a, b)
+    return a.x < b.x + b.w and a.x + a.w > b.x and a.y < b.y + b.h and a.y + a.h > b.y
+end
+
+local function updateBalls()
+    for i = #L.balls, 1, -1 do
+        local b = L.balls[i]
+        b.life = b.life - 1
+        b.vy = math.min(MAXFALL, b.vy + 0.15)
+        local vy = b.vy
+        local hitX, ground = move(b, true)
+        if ground then
+            b.bounces = b.bounces + 1
+            b.vy = -math.abs(vy) * 0.65
+        end
+        if hitX then b.vx = 0; b.life = math.min(b.life, 10) end
+        for _, c in ipairs(L.crabs) do
+            if c.dead == 0 and overlap(b, c) then
+                c.dead, c.vy, c.vx = -1, -3.5, (b.vx >= 0 and 1 or -1)
+                b.vx, b.vy = -b.vx * 0.4, -3
+                L.hits = L.hits + 1
+                L.shake = 4
+            end
+        end
+        if b.life <= 0 or b.bounces > 3 or b.y > 260 or math.abs(b.x - L.cam - 160) > 200 then
+            table.remove(L.balls, i)
+        end
+    end
+end
+
 local function updateCrabs()
     local p = L.p
     for _, c in ipairs(L.crabs) do
-        if c.dead > 0 then
+        if c.dead < 0 then                                  -- knocked out by the ball: flies off
+            c.x, c.vy = c.x + c.vx, c.vy + GRAV
+            c.y = c.y + c.vy
+            if c.y > 260 then c.dead = 99 end
+        elseif c.dead > 0 then
             c.dead = c.dead + 1
         elseif math.abs(c.x - L.cam - 160) < 220 then      -- only near the screen
             c.vy = math.min(MAXFALL, c.vy + GRAV)
@@ -174,7 +230,7 @@ function L.update()
     if L.state == "play" then
         if I.pressed("start") then L.state = "pause" return end
         updatePlayer()
-        if L.state == "play" then updateCrabs() end
+        if L.state == "play" then updateBalls(); updateCrabs() end
         local target = L.p.x + L.p.w / 2 - 140
         L.cam = math.max(0, math.min(L.map.w * TS - 320, target))
     elseif L.state == "pause" then
@@ -196,7 +252,15 @@ function L.draw()
     love.graphics.push()
     love.graphics.translate(sx, 0)
     layer(G.img.bg_sea, 110, 0.15)
-    layer(G.img.bg_palms, 110, 0.4)
+    layer(G.img.bg_palms, 88, 0.4)                       -- trunks end on the sand line (y 208)
+    -- sea visible in the pits
+    love.graphics.setColor(60 / 255, 100 / 255, 170 / 255)
+    love.graphics.rectangle("fill", 0, 211, 320, 29)
+    love.graphics.setColor(110 / 255, 150 / 255, 200 / 255)
+    for x = -math.floor(L.cam * 0.7 + L.t / 4) % 24 - 24, 320, 24 do
+        love.graphics.rectangle("fill", x, 212 + (math.floor(x / 24) % 2) * 6, 8, 1)
+    end
+    love.graphics.setColor(1, 1, 1)
     -- tiles
     local cam = math.floor(L.cam)
     local tiles = G.img.tiles
@@ -217,6 +281,8 @@ function L.draw()
         if c.dead == 0 then
             local f = math.floor(L.t / 12) % 2
             love.graphics.draw(crab, quad(crab, f * 24, 0, 24, 16), math.floor(c.x - 2 - cam), math.floor(c.y + c.h - 16))
+        elseif c.dead < 0 then                                   -- upside down
+            love.graphics.draw(crab, quad(crab, 0, 0, 24, 16), math.floor(c.x - 2 - cam), math.floor(c.y + c.h), 0, 1, -1)
         elseif c.dead < 20 then                                  -- squashed
             love.graphics.draw(crab, quad(crab, 0, 8, 24, 8), math.floor(c.x - 2 - cam), math.floor(c.y + c.h - 8))
         end
@@ -226,13 +292,22 @@ function L.draw()
     if p.inv == 0 or math.floor(L.t / 3) % 2 == 0 then
         local f
         if p.inv > 60 then f = "hurt"
-        elseif not p.ground then f = "jump"
-        elseif math.abs(p.vx) > 0.1 then f = RUNCYCLE[math.floor(p.anim / 10) % 4 + 1]
+        elseif p.throw > 0 then f = p.throw < THROW_WIND and "throw1" or "throw2"
+        elseif not p.ground then f = p.vy < 0 and "jump" or "fall"
+        elseif math.abs(p.vx) > 0.1 then f = RUNCYCLE[math.floor(p.anim / 8) % 4 + 1]
         else f = math.floor(L.t / 40) % 2 == 0 and "idle" or "idle2" end
         local img = G.img.nonno
         local x = math.floor(p.x - POX - cam)
-        if p.dir < 0 then x = x + 32 end
-        love.graphics.draw(img, quad(img, FRAMES[f] * 32, 0, 32, 48), x, math.floor(p.y - POY), 0, p.dir, 1)
+        if p.dir < 0 then x = x + FW end
+        love.graphics.draw(img, quad(img, FRAMES[f] * FW, 0, FW, FH), x, math.floor(p.y - POY), 0, p.dir, 1)
+        if p.throw > 0 and p.throw < THROW_WIND then          -- ball held up in the hand
+            local hx = p.dir > 0 and (p.x - POX + 36) or (p.x - POX + FW - 36 - 8)
+            love.graphics.draw(G.img.ball, quad(G.img.ball, 0, 0, 8, 8), math.floor(hx - cam), math.floor(p.y - POY + 18))
+        end
+    end
+    for _, b in ipairs(L.balls) do
+        local f = math.floor(L.t / 4) % 2
+        love.graphics.draw(G.img.ball, quad(G.img.ball, f * 8, 0, 8, 8), math.floor(b.x - cam), math.floor(b.y))
     end
     love.graphics.pop()
     -- HUD
@@ -242,7 +317,7 @@ function L.draw()
         love.graphics.rectangle("fill", 44 + (i - 1) * 9, 6, 7, 7)
     end
     love.graphics.setColor(1, 1, 1)
-    T.print("GRANCHI " .. L.stomps, 250, 6)
+    T.print("GRANCHI " .. (L.stomps + L.hits), 250, 6)
     if L.state == "pause" then T.center("PAUSA", 110, { 1, 0.85, 0.4 })
     elseif L.state == "clear" then
         T.center("UNA COPPA? E' FINTA!", 90, { 1, 0.85, 0.4 })

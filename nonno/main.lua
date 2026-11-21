@@ -28,7 +28,7 @@ end
 function love.load(args)
     R.init()
     T.init()
-    for _, n in ipairs({ "nonno_portrait", "nonno", "crab", "tiles", "bg_sky", "bg_sea", "bg_palms" }) do
+    for _, n in ipairs({ "nonno_portrait", "nonno", "crab", "ball", "tiles", "bg_sky", "bg_sea", "bg_palms" }) do
         G.img[n] = love.graphics.newImage("assets/" .. n .. ".png")
     end
     G.scenes.story = require("scenes.story")

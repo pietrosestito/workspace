@@ -62,7 +62,7 @@ def quantize_to(im, pal):
 SK, GR, OL = portrait.skin, portrait.grey, portrait.OL
 SHIRT, SHORT = portrait.SHIRT, portrait.SHORT
 SHOE = (120, 70, 40)
-FW, FH = 32, 48          # in-game frame
+FW, FH = 40, 52          # in-game frame (feet on row 50, outline on 51)
 
 
 def nonno_head(big):
@@ -85,43 +85,75 @@ def nonno_head(big):
     return head
 
 
-# pose: (left leg dx, left lift, right leg dx, right lift, arm L dy, arm R dy, body bob)
+# Frame order is the order of this dict (scenes/level.lua relies on it).
+# legs: (dx, lift) for the back leg and the front leg
+# arms: hand offset (dx, dy) from the shoulder for the back arm and the front arm (facing right)
+# bob: body shift down, tilt: head shift right
 POSES = {
-    'idle':  (0, 0, 0, 0, 0, 0, 0),
-    'idle2': (0, 0, 0, 0, 1, 1, 1),
-    'run1':  (-3, 2, 3, 0, -2, 2, 0),
-    'run2':  (0, 0, 0, 0, 0, 0, 1),
-    'run3':  (3, 0, -3, 2, 2, -2, 0),
-    'jump':  (-2, 3, 3, 1, -5, -5, 0),
-    'hurt':  (-2, 1, 2, 1, -4, -4, 0),
+    'idle':   dict(legs=((0, 0), (0, 0)), arms=((-1, 8), (1, 8)), bob=0, tilt=0),
+    'idle2':  dict(legs=((0, 0), (0, 0)), arms=((-1, 7), (1, 7)), bob=1, tilt=0),
+    'run1':   dict(legs=((-4, 1), (4, 0)), arms=((3, 7), (-3, 7)), bob=0, tilt=1),
+    'run2':   dict(legs=((0, 4), (0, 0)), arms=((0, 8), (0, 8)), bob=1, tilt=1),
+    'run3':   dict(legs=((4, 0), (-4, 1)), arms=((-3, 7), (3, 7)), bob=0, tilt=1),
+    'run4':   dict(legs=((0, 0), (0, 4)), arms=((0, 8), (0, 8)), bob=1, tilt=1),
+    'jump':   dict(legs=((-2, 4), (3, 2)), arms=((-9, -6), (9, -6)), bob=0, tilt=0),
+    'fall':   dict(legs=((-3, 1), (3, 1)), arms=((-8, 0), (8, 0)), bob=0, tilt=0),
+    'hurt':   dict(legs=((-3, 2), (2, 1)), arms=((-8, -4), (8, -4)), bob=1, tilt=-2),
+    'throw1': dict(legs=((-3, 0), (3, 0)), arms=((-1, 8), (9, -7)), bob=0, tilt=-1),
+    'throw2': dict(legs=((-3, 0), (4, 0)), arms=((-1, 8), (10, 3)), bob=1, tilt=2),
 }
+OX = 4                    # body offset inside the 40-px frame
 
 
 def nonno_frame(head, pose):
-    lx, ll, rx, rl, al, ar, bob = POSES[pose]
+    P = POSES[pose]
     im = Image.new('RGBA', (FW, FH), CLEAR)
     d = ImageDraw.Draw(im)
     A = lambda c: c + (255,)
-    y0 = 30 + bob
-    # legs (skin) + shoes
-    for (dx, lift, x) in ((lx, ll, 12), (rx, rl, 18)):
+    y0 = 30 + P['bob']                       # top of the torso
+    # legs (skin) + shoes, feet on row 50
+    for (dx, lift), x in zip(P['legs'], (OX + 12, OX + 18)):
         xx = x + dx
-        d.rectangle((xx, y0 + 11, xx + 2, 45 - lift), fill=A(SK[1]))
-        d.rectangle((xx + 2, y0 + 11, xx + 2, 45 - lift), fill=A(SK[2]))
-        d.rectangle((xx - 1, 45 - lift, xx + 3, 46 - lift), fill=A(SHOE))
-    # shorts
-    d.rectangle((10, y0 + 8, 22, y0 + 12), fill=A(SHORT))
-    # arms (behind torso edges), hands
-    for (x, dy) in ((7, al), (23, ar)):
-        d.rectangle((x, y0 + 1 + max(dy, -4), x + 2, y0 + 6 + dy), fill=A(SHIRT[1]))
-        d.rectangle((x, y0 + 7 + dy, x + 2, y0 + 8 + dy), fill=A(SK[1]))
-    # torso
-    d.rectangle((10, y0, 22, y0 + 8), fill=A(SHIRT[1]))
-    d.rectangle((10, y0, 12, y0 + 8), fill=A(SHIRT[0]))
-    d.rectangle((20, y0, 22, y0 + 8), fill=A(SHIRT[2]))
-    d.polygon([(14, y0), (18, y0), (16, y0 + 3)], fill=A(SK[2]))      # neck/collar
-    im.alpha_composite(head, (2, bob))
+        d.rectangle((xx, y0 + 10, xx + 2, 48 - lift), fill=A(SK[1]))
+        d.line((xx + 2, y0 + 10, xx + 2, 48 - lift), fill=A(SK[2]))
+        d.rectangle((xx - 1, 49 - lift, xx + 3, 50 - lift), fill=A(SHOE))
+    # shorts, torso
+    d.rectangle((OX + 10, y0 + 8, OX + 22, y0 + 11), fill=A(SHORT))
+    d.rectangle((OX + 10, y0, OX + 22, y0 + 8), fill=A(SHIRT[1]))
+    d.rectangle((OX + 10, y0, OX + 12, y0 + 8), fill=A(SHIRT[0]))
+    d.rectangle((OX + 20, y0, OX + 22, y0 + 8), fill=A(SHIRT[2]))
+    d.polygon([(OX + 14, y0), (OX + 18, y0), (OX + 16, y0 + 3)], fill=A(SK[2]))      # collar
+    im.alpha_composite(head, (OX + 2 + P['tilt'], P['bob']))
+    # arms: 3-px sleeve from the shoulder towards the hand, 3x3 skin hand (over the head edge)
+    for (hx, hy), sx in zip(P['arms'], (OX + 9, OX + 23)):
+        x0, yy0, x1, y1 = sx, y0 + 1, sx + hx, y0 + 1 + hy
+        n = max(abs(x1 - x0), abs(y1 - yy0), 1)
+        for k in range(n + 1):
+            x = round(x0 + (x1 - x0) * k / n)
+            y = round(yy0 + (y1 - yy0) * k / n)
+            d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=A(SHIRT[1] if k < n - 1 else SK[1]))
     return outline(im, OL)
+
+
+BALL_PAL = {'o': (40, 30, 60), 'w': (255, 255, 255), 'b': (60, 110, 220), 'y': (250, 210, 40)}
+BALL = """
+..oooo..
+.owwbbo.
+owwwbbbo
+obwwwyyo
+obbwwyyo
+oyybwwwo
+.oyybwo.
+..oooo..
+"""
+
+
+def build_ball():
+    f = np.array(ascii_sprite(BALL, BALL_PAL))
+    sheet = Image.new('RGBA', (16, 8), CLEAR)
+    sheet.paste(Image.fromarray(f), (0, 0))
+    sheet.paste(Image.fromarray(np.rot90(f).copy()), (8, 0))
+    save(sheet, 'ball.png')
 
 
 def build_nonno():
@@ -133,6 +165,8 @@ def build_nonno():
     for i, n in enumerate(names):
         sheet.alpha_composite(nonno_frame(head, n), (i * FW, 0))
     save(sheet, 'nonno.png')
+    with open(os.path.join(OUT, 'nonno.txt'), 'w') as f:
+        f.write(' '.join(names) + '\n')
     return names
 
 
@@ -299,7 +333,6 @@ def build_backgrounds():
                 px = top[0] + int(r * np.cos(a))
                 py = top[1] + int(r * np.sin(a) * .5 + (r / 26) ** 2 * 14)
                 d.rectangle((px - 1, py - 1, px + 1, py + 1 - (r > 18)), fill=pc[0] + (255,))
-    d.rectangle((0, 112, 319, 119), fill=pc[0] + (255,))
     save(mid, 'bg_palms.png')
 
 
@@ -333,6 +366,7 @@ if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     build_nonno()
     build_crab()
+    build_ball()
     build_tiles()
     build_backgrounds()
     build_font()
