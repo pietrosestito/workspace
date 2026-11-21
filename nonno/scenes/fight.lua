@@ -6,9 +6,10 @@ local T = require("lib.text")
 local I = require("lib.input")
 local F = {}
 
-local GROUND, LEFT, RIGHT = 212, 22, 298
+local GROUND, ARENA = 214, 480                 -- arena wider than the screen: the camera follows
+local LEFT, RIGHT, MAXGAP = 28, ARENA - 28, 250
 local GRAV, JUMPV, JUMPX = 0.32, -6.8, 2.2
-local WALKF, WALKB = 1.6, 1.3
+local WALKF, WALKB = 1.9, 1.5
 local HITSTOP, ROUND_TIME, ROUNDS_TO_WIN = 6, 60, 2
 local CHARGE = 40                    -- frames of "back" for the Toro's charge
 
@@ -139,7 +140,7 @@ local function updateFighter(f, o)
             if f.y >= GROUND then f.y, f.vy, f.vx = GROUND, 0, 0; f.state = "idle" return end
         end
         if m.spawn and f.mt == m.spawn and not F.proj[f.side] then
-            F.proj[f.side] = { x = f.x + 30 * f.dir, y = f.y - 52, vx = 3.2 * f.dir, owner = f, t = 0 }
+            F.proj[f.side] = { x = f.x + 50 * f.dir, y = f.y - 92, vx = 3.6 * f.dir, owner = f, t = 0 }
         end
         if m.dash and cur and cur[3] then f.x = f.x + m.dash * f.dir end
         if m.chain and f.hitDone then                          -- combo: cancel into the next attack
@@ -266,19 +267,23 @@ local function resolve()
             if def.state ~= "ko" and circleRect(pr.x, pr.y, 7, hurtBox(def)) then
                 applyHit(pr.owner, def, BALL, pr.x, pr.y, pr.x - pr.vx * 5)
                 F.proj[side] = nil
-            elseif pr.x < -20 or pr.x > 340 then
+            elseif pr.x < F.cam - 20 or pr.x > F.cam + 340 then
                 F.proj[side] = nil
             end
         end
     end
     -- push boxes and walls
     local dx = B.x - A.x
-    if math.abs(dx) < 26 and math.abs(A.y - B.y) < 50 then
-        local push = (26 - math.abs(dx)) / 2
+    if math.abs(dx) < 40 and math.abs(A.y - B.y) < 80 then
+        local push = (40 - math.abs(dx)) / 2
         local s = dx >= 0 and 1 or -1
         A.x, B.x = A.x - push * s, B.x + push * s
     end
-    for _, f in ipairs(F.f) do f.x = math.max(LEFT, math.min(RIGHT, f.x)) end
+    local mid = (A.x + B.x) / 2                         -- both always on screen
+    for _, f in ipairs(F.f) do
+        f.x = math.max(LEFT, math.min(RIGHT, math.max(mid - MAXGAP / 2, math.min(mid + MAXGAP / 2, f.x))))
+    end
+    F.cam = math.max(0, math.min(ARENA - 320, (A.x + B.x) / 2 - 160))
 end
 
 -- ------------------------------------------------------------------ CPU
@@ -290,17 +295,17 @@ function F.newAI(side, seed, blockRate)
     local function plan(f, o)
         local dist = math.abs(o.x - f.x)
         local incoming = F.proj[3 - side]
-        if incoming and math.abs(incoming.x - f.x) < 110 then
+        if incoming and math.abs(incoming.x - f.x) < 140 then
             if rng:random() < 0.5 then push({ up = true, fwd = true }, 3); push({}, 20)
             else push({ back = true }, 30) end
             return
         end
-        if o.state == "attack" and dist < 95 and rng:random() < blockRate then
+        if o.state == "attack" and dist < 130 and rng:random() < blockRate then
             push({ back = true, down = o.move and o.move.level == "low" }, 16)
             return
         end
         local r = rng:random()
-        if dist > 90 then
+        if dist > 130 then
             if f.info.special == "ball" and r < 0.35 then
                 push({ down = true }, 3); push({ down = true, fwd = true }, 3); push({ fwd = true }, 2)
                 push({ fwd = true, y = true }, 2); push({}, 12)
@@ -309,7 +314,7 @@ function F.newAI(side, seed, blockRate)
             else
                 push({ fwd = true }, 14 + rng:random(0, 14))
             end
-        elseif dist > 62 then
+        elseif dist > 88 then
             if r < 0.22 then push({ up = true, fwd = true }, 3); push({}, 12); push({ b = true }, 2); push({}, 24)
             elseif r < 0.32 then push({ back = true }, 16)
             else push({ fwd = true }, 10) end
@@ -347,7 +352,8 @@ function F.enter(opts)
     opts = opts or {}
     F.stats = { hits = { 0, 0 }, blocks = { 0, 0 }, specials = { 0, 0 }, rounds = 0 }
     local c1 = opts.p1ai and F.newAI(1, opts.seed or 11, 0.3) or playerCtrl
-    F.f = { newFighter("nonno", 100, 1, c1), newFighter("toro", 220, -1, F.newAI(2, (opts.seed or 11) + 1, 0.35)) }
+    F.f = { newFighter("nonno", 170, 1, c1), newFighter("toro", 310, -1, F.newAI(2, (opts.seed or 11) + 1, 0.35)) }
+    F.cam = 80
     F.f[1].side, F.f[2].side = 1, 2
     F.round, F.phase, F.pt = 0, "vs", 0
     F.proj, F.fx, F.hitstop, F.shake = {}, {}, 0, 0
@@ -355,8 +361,9 @@ end
 
 local function startRound()
     F.round = F.round + 1
-    resetFighter(F.f[1], 100, 1)
-    resetFighter(F.f[2], 220, -1)
+    resetFighter(F.f[1], 170, 1)
+    resetFighter(F.f[2], 310, -1)
+    F.cam = 80
     F.proj, F.fx = {}, {}
     F.timer, F.phase, F.pt = ROUND_TIME, "intro", 0
 end
@@ -419,20 +426,27 @@ end
 
 -- ------------------------------------------------------------------ drawing
 local function drawFighter(f, scale, x, y)
-    local d = f.data[f.frame]
-    local i = d.i
-    love.graphics.draw(f.img, quad(f.img, (i % 8) * 96, math.floor(i / 8) * 96, 96, 96),
-        math.floor(x or f.x), math.floor(y or f.y), 0, f.dir * (scale or 1), scale or 1, 48, 94)
+    local D = f.data
+    local i, fs = D[f.frame].i, D.size
+    love.graphics.draw(f.img, quad(f.img, (i % D.cols) * fs, math.floor(i / D.cols) * fs, fs, fs),
+        math.floor(x or (f.x - F.cam)), math.floor(y or f.y), 0, f.dir * (scale or 1), scale or 1, D.ox, D.oy)
+end
+
+-- tile a 320-wide layer with a parallax factor
+local function layer(img, y, k)
+    local off = -math.floor(F.cam * k) % img:getWidth()
+    for x = off - img:getWidth(), 320, img:getWidth() do love.graphics.draw(img, x, y) end
 end
 
 local function stage()
     love.graphics.draw(G.img.bg_sky, 0, 0)
-    love.graphics.draw(G.img.bg_sea, 0, 110)
-    love.graphics.draw(G.img.bg_palms, 0, 88)
+    layer(G.img.bg_sea, 110, 0.3)
+    layer(G.img.bg_palms, 88, 0.6)
     local tiles = G.img.tiles
-    for x = 0, 19 do
-        love.graphics.draw(tiles, quad(tiles, 0, 0, 16, 16), x * 16, 208)
-        love.graphics.draw(tiles, quad(tiles, 16, 0, 16, 16), x * 16, 224)
+    local off = -math.floor(F.cam) % 16
+    for x = off - 16, 320, 16 do
+        love.graphics.draw(tiles, quad(tiles, 0, 0, 16, 16), x, 208)
+        love.graphics.draw(tiles, quad(tiles, 16, 0, 16, 16), x, 224)
     end
 end
 
@@ -471,11 +485,11 @@ function F.draw()
         love.graphics.polygon("fill", 190, 0, 320, 0, 320, 240, 130, 240)
         love.graphics.setColor(1, 1, 1)
         local slide = math.max(0, 40 - F.pt) * 4
-        drawFighter(F.f[1], 2, 82 - slide, 226)
-        drawFighter(F.f[2], 2, 238 + slide, 226)
+        drawFighter(F.f[1], 1, 84 - slide, 206)
+        drawFighter(F.f[2], 1, 236 + slide, 206)
         T.print(F.f[1].info.name, 20, 210, { 1, 0.85, 0.4 })
         T.print(F.f[2].info.name, 300 - T.width(F.f[2].info.name), 210, { 1, 0.85, 0.4 })
-        if F.pt > 40 then T.big("VS", 96, 4, { 1, 0.9, 0.3 }) end
+        if F.pt > 40 then T.big("VS", 30, 4, { 1, 0.9, 0.3 }) end
         return
     end
     love.graphics.push()
@@ -483,7 +497,7 @@ function F.draw()
     stage()
     -- shadows (solid, no alpha)
     love.graphics.setColor(196 / 255, 156 / 255, 90 / 255)
-    for _, f in ipairs(F.f) do love.graphics.ellipse("fill", math.floor(f.x), GROUND - 1, 18, 3) end
+    for _, f in ipairs(F.f) do love.graphics.ellipse("fill", math.floor(f.x - F.cam), GROUND - 1, 26, 4) end
     love.graphics.setColor(1, 1, 1)
     local A, B = F.f[1], F.f[2]
     local first, second = A, B
@@ -494,29 +508,29 @@ function F.draw()
         local pr = F.proj[side]
         if pr then
             local k = math.floor(pr.t / 4) % 2
-            love.graphics.draw(G.img.bigball, quad(G.img.bigball, k * 16, 0, 16, 16), math.floor(pr.x - 8), math.floor(pr.y - 8))
+            love.graphics.draw(G.img.bigball, quad(G.img.bigball, k * 16, 0, 16, 16), math.floor(pr.x - 8 - F.cam), math.floor(pr.y - 8))
         end
     end
     for _, e in ipairs(F.fx) do
         local k = (e.t < 5 and 0 or 1) + (e.blue and 2 or 0)
-        love.graphics.draw(G.img.spark, quad(G.img.spark, k * 15, 0, 15, 13), math.floor(e.x - 7), math.floor(e.y - 6))
+        love.graphics.draw(G.img.spark, quad(G.img.spark, k * 15, 0, 15, 13), math.floor(e.x - 15 - F.cam), math.floor(e.y - 13), 0, 2, 2)
     end
     love.graphics.pop()
     hud()
     if F.phase == "intro" then
-        if F.pt < 60 then T.big("ROUND " .. F.round, 96, 3, { 1, 1, 1 })
-        else T.big("COMBATTI!", 96, 3, { 1, 0.85, 0.3 }) end
+        if F.pt < 60 then T.big("ROUND " .. F.round, 46, 3, { 1, 1, 1 })
+        else T.big("COMBATTI!", 46, 3, { 1, 0.85, 0.3 }) end
     elseif F.phase == "ko" then
-        T.big(F.koText, 96, 4, { 1, 0.3, 0.3 })
+        T.big(F.koText, 44, 4, { 1, 0.3, 0.3 })
     elseif F.phase == "roundend" then
-        T.big(F.winner and ("VINCE " .. F.winner.info.name) or "PAREGGIO", 100, 2, { 1, 0.85, 0.3 })
+        T.big(F.winner and ("VINCE " .. F.winner.info.name) or "PAREGGIO", 50, 2, { 1, 0.85, 0.3 })
     elseif F.phase == "end" then
         local A2, B2 = F.f[1], F.f[2]
         local w = A2.wins > B2.wins and A2 or (B2.wins > A2.wins and B2 or nil)
-        T.big(w and (w.info.name .. " CAMPIONE!") or "PAREGGIO", 90, 2, { 1, 0.85, 0.3 })
-        if F.pt > 60 then T.center("PREMI START", 124, { 0.7, 0.9, 1 }) end
+        T.big(w and (w.info.name .. " CAMPIONE!") or "PAREGGIO", 46, 2, { 1, 0.85, 0.3 })
+        if F.pt > 60 then T.center("PREMI START", 64, { 0.7, 0.9, 1 }) end
     end
-    if F.paused then T.big("PAUSA", 100, 3, { 1, 0.85, 0.3 }) end
+    if F.paused then T.big("PAUSA", 46, 3, { 1, 0.85, 0.3 }) end
 end
 
 return F

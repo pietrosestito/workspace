@@ -26,7 +26,7 @@ function A.update()
             if not seen.hit and not e.blue and e.t == 1 then seen.hit = true; want = "f3_hit" end
             if not seen.block and e.blue and e.t == 1 then seen.block = true; want = "f4_block" end
         end
-        if not seen.ball and F.proj[1] and F.proj[1].t == 12 then seen.ball = true; want = "f5_ball" end
+        if not seen.ball and F.proj[1] and F.proj[1].t == 5 then seen.ball = true; want = "f5_ball" end
         local tf = F.f[2]
         if not seen.charge and tf.state == "attack" and tf.mname == "charge" and tf.mt == 14 then seen.charge = true; want = "f6_charge" end
         if not seen.jump and F.f[1].state == "attack" and F.f[1].mname == "jk" and F.f[1].mt == 6 then seen.jump = true; want = "f6b_jumpkick" end
